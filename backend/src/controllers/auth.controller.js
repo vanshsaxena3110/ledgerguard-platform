@@ -53,13 +53,7 @@ export const signup = async (req, res) => {
 
     const token = generateToken(user._id, company._id);
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
+    
     res.status(201).json({
       message: "Signup successful",
       user: {
@@ -108,23 +102,19 @@ export const login = async (req, res) => {
     }
 
     const token = generateToken(user._id, user.company._id);
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+   
 
     res.json({
-      message: "Login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        company: user.company.name,
-        role: user.role,
-      },
-    });
+  message: "Login successful",
+  token: token,
+  user: {
+    id: user._id,
+    name: user.name,
+    company: user.company.name,
+    role: user.role,
+  },
+});
+
   } catch (error) {
     console.error("Login error:", error.message);
 
