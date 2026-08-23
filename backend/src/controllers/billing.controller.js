@@ -16,12 +16,26 @@ export const getBilling = async (req, res) => {
       .filter((transaction) => transaction.type === "debit")
       .reduce((sum, transaction) => sum + transaction.amount, 0);
     const balance = totalCredit - totalDebit;
+
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+
+    const monthlyTransactions = transactions.filter((transaction) => {
+      const date = new Date(transaction.createdAt);
+
+      return (
+        date.getMonth() === currentMonth &&
+        date.getFullYear() === currentYear
+      );
+    });
+
     res.json({
       billing: {
         totalTransactions,
         totalCredit,
         totalDebit,
         balance,
+        monthlyTransactions: monthlyTransactions.length,
       },
     });
   } catch (error) {

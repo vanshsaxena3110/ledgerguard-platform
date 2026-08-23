@@ -1,6 +1,8 @@
 import Transaction from "../models/Transaction.js";
 import { generateTransactionId } from "../utils/generateTransactionId.js";
 
+import { getIO } from "../socket/socket.js";
+
 export const createTransaction = async (req, res) => {
   try {
     const { type, amount, description } = req.body;
@@ -19,6 +21,12 @@ export const createTransaction = async (req, res) => {
       description,
       status: "completed",
     });
+
+  getIO()
+  .to(`company:${req.companyId}`)
+  .emit("transactionCreated", {
+    transaction,
+  });
 
     res.status(201).json({
       message: "Transaction created successfully",
@@ -63,6 +71,11 @@ export const deleteTransaction = async (req, res) => {
         message: "Transaction not found",
       });
     }
+   getIO()
+  .to(`company:${req.companyId}`)
+  .emit("transactionDeleted", {
+    transactionId: req.params.id,
+  });
 
     res.json({
       message: "Transaction deleted successfully",
@@ -101,6 +114,11 @@ export const updateTransaction = async (req, res) => {
         message: "Transaction not found",
       });
     }
+   getIO()
+  .to(`company:${req.companyId}`)
+  .emit("transactionUpdated", {
+    transaction,
+  });
 
     res.json({
       message: "Transaction updated successfully",
