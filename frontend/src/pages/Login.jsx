@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import buildingBg from '../assets/building.png';
 
-export default function Login() {
+export default function Login({ onLoginSuccess }) {
   const [isRegister, setIsRegister] = useState(false);
   
   // Login form states
@@ -20,7 +20,7 @@ export default function Login() {
 
   const handleLoginSubmit = (e) => {
     e.preventDefault();
-    console.log('Login submitted', { loginEmail, loginPassword, loginCompany });
+    if (onLoginSuccess) onLoginSuccess();
   };
 
   const handleRegisterSubmit = (e) => {
