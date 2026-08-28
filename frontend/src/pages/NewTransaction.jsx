@@ -90,7 +90,7 @@ export default function NewTransaction({ onCancel, onSuccess }) {
         {success && (
           <div className="new-tx-alert success">
             <span className="alert-icon">✓</span>
-            <span>Transaction created successfully! Returning to ledger...</span>
+            <span>Transaction created successfully! Return to ledger...</span>
           </div>
         )}
 
