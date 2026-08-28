@@ -179,7 +179,7 @@ export default function NewTransaction({ onCancel, onSuccess }) {
             <div className="new-tx-group">
               <label className="new-tx-label">Amount <span className="required">*</span></label>
               <div className="new-tx-amount-group">
-                <span className="currency-symbol">$</span>
+                <span className="currency-symbol">₹</span>
                 <input
                   type="number"
                   step="0.01"

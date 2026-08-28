@@ -18,6 +18,10 @@ async function authRequest(endpoint, body) {
 export function signup(credentials) { return authRequest('/auth/signup', credentials); }
 export function login(credentials) { return authRequest('/auth/login', credentials); }
 
+export function fetchCurrentUser() { return apiRequest('/auth/me'); }
+export function updateProfile(name) { return apiRequest('/auth/profile', { method: 'PUT', body: JSON.stringify({ name }) }); }
+export function updateCompany(name) { return apiRequest('/auth/company', { method: 'PUT', body: JSON.stringify({ name }) }); }
+
 async function apiRequest(endpoint, options = {}) {
   const token = getAuthToken();
   const headers = { 'Content-Type': 'application/json', ...options.headers };
@@ -33,6 +37,11 @@ async function apiRequest(endpoint, options = {}) {
 export async function fetchTransactions() {
   const data = await apiRequest('/transactions');
   return data.transactions || [];
+}
+
+export async function fetchTransactionById(transactionId) {
+  const transactions = await fetchTransactions();
+  return transactions.find((transaction) => transaction?._id === transactionId || transaction?.transactionId === transactionId) || null;
 }
 
 export async function createTransaction(transactionData) {

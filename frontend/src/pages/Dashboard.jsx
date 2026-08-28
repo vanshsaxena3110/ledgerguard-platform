@@ -4,7 +4,8 @@ import Billing from './Billing.jsx';
 import NewTransaction from './NewTransaction.jsx';
 import Analytics from './Analytics.jsx';
 import Settings from './Settings.jsx';
-import { fetchTransactions } from '../services/api.js';
+import { fetchTransactions, getAuthToken } from '../services/api.js';
+import socket from '../socket/socket.js';
 
 
 const NAV_ITEMS = [
@@ -16,16 +17,16 @@ const NAV_ITEMS = [
 ];
 
 const STATS = [
-  { title: 'Total Balance', value: '$12,450,', icon: 'bank', color: '#6b7280', sub: '↗ +2.4% vs last month' },
-  { title: 'Total Credit', value: '$3,240,500.0', icon: 'arrow-down', color: '#10b981', sub: 'Inbound volume (MTD)', arrow: '↓' },
-  { title: 'Total Debit', value: '$1,890,200.0', icon: 'arrow-up', color: '#ef4444', sub: 'Outbound volume (MTD)', arrow: '↑' },
+  { title: 'Total Balance', value: '₹12,450,', icon: 'bank', color: '#6b7280', sub: '↗ +2.4% vs last month' },
+  { title: 'Total Credit', value: '₹3,240,500.0', icon: 'arrow-down', color: '#10b981', sub: 'Inbound volume (MTD)', arrow: '↓' },
+  { title: 'Total Debit', value: '₹1,890,200.0', icon: 'arrow-up', color: '#ef4444', sub: 'Outbound volume (MTD)', arrow: '↑' },
   { title: 'Volume', value: '14,239', icon: 'file', color: '#3b82f6', sub: 'Processed transactions' },
 ];
 
 const TRANSACTIONS = [
-  { id: 'TX-992384A', date: 'Oct 24, 14:32 EST', party: 'Acme Corp', amount: '+$125,888.90', status: 'Completed' },
-  { id: 'TX-881275B', date: 'Oct 23, 09:15 EST', party: 'GlobalTech Inc', amount: '-$42,300.00', status: 'Pending' },
-  { id: 'TX-770166C', date: 'Oct 22, 16:48 EST', party: 'Nexus Holdings', amount: '+$89,450.25', status: 'Completed' },
+  { id: 'TX-992384A', date: 'Oct 24, 14:32 EST', party: 'Acme Corp', amount: '+₹125,888.90', status: 'Completed' },
+  { id: 'TX-881275B', date: 'Oct 23, 09:15 EST', party: 'GlobalTech Inc', amount: '-₹42,300.00', status: 'Pending' },
+  { id: 'TX-770166C', date: 'Oct 22, 16:48 EST', party: 'Nexus Holdings', amount: '+₹89,450.25', status: 'Completed' },
 ];
 
 const TREND_DATA = [
@@ -38,6 +39,7 @@ const TREND_DATA = [
 ];
 
 const FILTER_OPTIONS = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'This Year', 'All Time'];
+const formatINR = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 
 /* ── Icon helper ── */
 function Icon({ name, size = 18 }) {
@@ -130,7 +132,7 @@ function LineChart() {
       {gridLines.map((v, i) => (
         <g key={i}>
           <line x1={padL} y1={sy(v)} x2={w - padR} y2={sy(v)} stroke="#f1f5f9" strokeWidth="1" />
-          <text x={padL - 8} y={sy(v) + 4} textAnchor="end" fontSize="10" fill="#94a3b8">${Math.round(v / 1000)}k</text>
+          <text x={padL - 8} y={sy(v) + 4} textAnchor="end" fontSize="10" fill="#94a3b8">₹{Math.round(v / 1000)}k</text>
         </g>
       ))}
       {/* Area + Line */}
@@ -144,7 +146,7 @@ function LineChart() {
             <>
               <line x1={sx(i)} y1={sy(d.value) + 6} x2={sx(i)} y2={padT + chartH} stroke="#4f46e5" strokeWidth="1" strokeDasharray="3,3" opacity="0.4" />
               <rect x={sx(i) - 30} y={sy(d.value) - 28} width="60" height="22" rx="5" fill="#0f172a" />
-              <text x={sx(i)} y={sy(d.value) - 13} textAnchor="middle" fontSize="11" fill="#fff" fontWeight="600">${d.value}k</text>
+              <text x={sx(i)} y={sy(d.value) - 13} textAnchor="middle" fontSize="11" fill="#fff" fontWeight="600">₹{d.value}k</text>
             </>
           )}
           <text x={sx(i)} y={h - 4} textAnchor="middle" fontSize="10" fill="#64748b">{d.label}</text>
@@ -186,6 +188,43 @@ export default function Dashboard({ onLogout }) {
 
   useEffect(() => {
     loadTransactions();
+
+    const getCompanyId = () => {
+      try {
+        const token = getAuthToken();
+        const payload = token && JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return payload?.companyId;
+      } catch {
+        return null;
+      }
+    };
+    const joinCompany = () => {
+      const companyId = getCompanyId();
+      if (companyId) socket.emit('joinCompany', companyId);
+    };
+    const handleCreated = ({ transaction }) => {
+      if (transaction) setDbTransactions((current) => [transaction, ...current.filter((tx) => tx._id !== transaction._id)]);
+    };
+    const handleUpdated = ({ transaction }) => {
+      if (transaction) setDbTransactions((current) => current.map((tx) => tx._id === transaction._id ? transaction : tx));
+    };
+    const handleDeleted = ({ transactionId }) => {
+      setDbTransactions((current) => current.filter((tx) => tx._id !== transactionId && tx.transactionId !== transactionId));
+    };
+
+    socket.on('connect', joinCompany);
+    socket.on('transactionCreated', handleCreated);
+    socket.on('transactionUpdated', handleUpdated);
+    socket.on('transactionDeleted', handleDeleted);
+    socket.connect();
+
+    return () => {
+      socket.off('connect', joinCompany);
+      socket.off('transactionCreated', handleCreated);
+      socket.off('transactionUpdated', handleUpdated);
+      socket.off('transactionDeleted', handleDeleted);
+      socket.disconnect();
+    };
   }, []);
 
   const mapTx = (tx) => {
@@ -197,8 +236,8 @@ export default function Dashboard({ onLogout }) {
     const formattedDate = `${month} ${day}, ${hours}:${minutes} EST`;
 
     const amountStr = tx.type === 'credit'
-      ? `+$${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-      : `-$${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+      ? `+${formatINR(tx.amount)}`
+      : `-${formatINR(tx.amount)}`;
 
     const capStatus = tx.status ? tx.status.charAt(0).toUpperCase() + tx.status.slice(1) : 'Completed';
 
@@ -213,6 +252,21 @@ export default function Dashboard({ onLogout }) {
   };
 
   const transactionsToRender = dbTransactions.map(mapTx);
+
+  const totalCredit = dbTransactions.reduce((total, tx) => {
+    const amount = Number(tx.amount);
+    return tx.type === 'credit' && Number.isFinite(amount) ? total + amount : total;
+  }, 0);
+  const totalDebit = dbTransactions.reduce((total, tx) => {
+    const amount = Number(tx.amount);
+    return tx.type === 'debit' && Number.isFinite(amount) ? total + amount : total;
+  }, 0);
+  const summaryValues = {
+    'Total Balance': formatINR(totalCredit - totalDebit),
+    'Total Credit': formatINR(totalCredit),
+    'Total Debit': formatINR(totalDebit),
+    Volume: dbTransactions.length.toLocaleString('en-US'),
+  };
 
   const exportCSV = () => {
     const header = 'Transaction ID,Date & Time,Counterparty,Amount,Status';
@@ -397,7 +451,7 @@ export default function Dashboard({ onLogout }) {
                         <Icon name={s.icon} size={16} />
                       </span>
                     </div>
-                    <div className="dash-stat-value">{s.value}</div>
+                    <div className="dash-stat-value">{summaryValues[s.title]}</div>
                     <div className="dash-stat-sub">{s.sub}</div>
                   </div>
                 ))}
@@ -433,7 +487,7 @@ export default function Dashboard({ onLogout }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {TRANSACTIONS.map((t, i) => (
+                    {transactionsToRender.slice(0, 3).map((t, i) => (
                       <tr key={i}>
                         <td className="dash-tx-id">{t.id}</td>
                         <td>{t.date}</td>

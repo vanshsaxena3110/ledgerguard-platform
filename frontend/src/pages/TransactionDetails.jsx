@@ -1,72 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { fetchTransactionById } from '../services/api.js';
 
-/* Static detail data — easy to replace with API response later */
-const TX_DETAILS = {
-  'TX-992384A': {
-    type: 'Wire Transfer Out', refId: 'TRN-2023-88924A',
-    date: 'Oct 24, 2023 · 14:32:01 UTC', status: 'Settled',
-    amount: '-$1,250,000.00', amountLabel: 'Settlement Amount',
-    counterparty: { name: 'Acme Global Holdings LLP', acct: '••4V2' },
-    originator: { name: 'LedgerGuard Corp (US Main)', acct: '••1109' },
-    swift: 'CHASUS33XXX', purposeCode: 'INVS (Investment/Capital)',
-    memo: 'Q4 Capital injection for European subsidiary expansion as per board resolution #B82.',
-    timeline: [
-      { label: 'Settled', desc: 'Funds available to recipient', time: 'Oct 24, 14:32 UTC', active: true },
-      { label: 'Processing', desc: 'Dispatched to clearing network', time: 'Oct 24, 14:20 UTC', active: false },
-      { label: 'Approved', desc: 'Required signatures collected', time: 'Oct 24, 13:55 UTC', active: false },
-      { label: 'Initiated', desc: 'Draft created by controller', time: 'Oct 24, 13:45 UTC', active: false },
-    ],
-    auditLog: [
-      { time: '14:32:01', event: 'Final Settlement', actor: 'Federal Reserve ACH', sig: 'fed-sys-099' },
-      { time: '14:15:22', event: 'Network Broadcast', actor: 'Treasury Core', sig: 'SVS-batch-22' },
-      { time: '13:45:08', event: 'Multi-Sig Approval', actor: 'Sarah Jenkins (CFO)', sig: 'auth-key-8a2' },
-    ],
-  },
-  'TX-881275B': {
-    type: 'Wire Transfer In', refId: 'TRN-2023-81275B',
-    date: 'Oct 23, 2023 · 09:15:44 UTC', status: 'Pending',
-    amount: '-$42,300.00', amountLabel: 'Transfer Amount',
-    counterparty: { name: 'GlobalTech Inc', acct: '••7K1' },
-    originator: { name: 'LedgerGuard Corp (US Main)', acct: '••1109' },
-    swift: 'DEUTDEFF', purposeCode: 'CORT (Trade Settlement)',
-    memo: 'Monthly SaaS platform licensing fee — Invoice #GT-10234.',
-    timeline: [
-      { label: 'Settled', desc: 'Funds available to recipient', time: '—', active: false },
-      { label: 'Processing', desc: 'Dispatched to clearing network', time: 'Oct 23, 09:20 UTC', active: true },
-      { label: 'Approved', desc: 'Required signatures collected', time: 'Oct 23, 09:10 UTC', active: false },
-      { label: 'Initiated', desc: 'Draft created by controller', time: 'Oct 23, 09:00 UTC', active: false },
-    ],
-    auditLog: [
-      { time: '09:15:44', event: 'Network Broadcast', actor: 'Treasury Core', sig: 'SVS-batch-19' },
-      { time: '09:10:12', event: 'Approval Granted', actor: 'Mark Chen (VP Finance)', sig: 'auth-key-3f1' },
-    ],
-  },
-  'TX-770166C': {
-    type: 'Wire Transfer In', refId: 'TRN-2023-70166C',
-    date: 'Oct 22, 2023 · 16:48:33 UTC', status: 'Settled',
-    amount: '+$89,450.25', amountLabel: 'Settlement Amount',
-    counterparty: { name: 'Nexus Holdings', acct: '••9R3' },
-    originator: { name: 'LedgerGuard Corp (US Main)', acct: '••1109' },
-    swift: 'BOFAUS3N', purposeCode: 'GDDS (Goods Purchase)',
-    memo: 'Payment received for Q3 consulting deliverables — PO #NX-4401.',
-    timeline: [
-      { label: 'Settled', desc: 'Funds available to recipient', time: 'Oct 22, 16:48 UTC', active: true },
-      { label: 'Processing', desc: 'Dispatched to clearing network', time: 'Oct 22, 16:30 UTC', active: false },
-      { label: 'Approved', desc: 'Auto-approved (below threshold)', time: 'Oct 22, 16:25 UTC', active: false },
-      { label: 'Initiated', desc: 'Inbound wire received', time: 'Oct 22, 16:20 UTC', active: false },
-    ],
-    auditLog: [
-      { time: '16:48:33', event: 'Final Settlement', actor: 'Federal Reserve ACH', sig: 'fed-sys-077' },
-      { time: '16:30:10', event: 'Network Broadcast', actor: 'Treasury Core', sig: 'SVS-batch-18' },
-      { time: '16:25:01', event: 'Auto-Approval', actor: 'System (Policy Engine)', sig: 'sys-auto-44' },
-    ],
-  },
-};
-
-/* Fallback for unknown IDs */
-const DEFAULT_TX = TX_DETAILS['TX-992384A'];
-
-/* ── Icon (tiny reusable) ── */
 function I({ name, size = 16 }) {
   const p = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', width: size, height: size };
   const map = {
@@ -82,145 +16,87 @@ function I({ name, size = 16 }) {
   return <svg viewBox="0 0 24 24" style={{ width: size, height: size }} {...p}>{map[name]}</svg>;
 }
 
+const formatINR = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+const formatDate = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Not available' : date.toLocaleString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short' });
+};
+
+const downloadTextFile = (filename, content) => {
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+};
+
 export default function TransactionDetails({ txId, onBack }) {
-  const tx = TX_DETAILS[txId] || DEFAULT_TX;
+  const [tx, setTx] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setError('');
+    fetchTransactionById(txId)
+      .then((transaction) => {
+        if (!mounted) return;
+        if (!transaction) setError('Transaction not found');
+        else setTx(transaction);
+      })
+      .catch((requestError) => mounted && setError(requestError.message || 'Unable to load transaction'))
+      .finally(() => mounted && setLoading(false));
+    return () => { mounted = false; };
+  }, [txId]);
+
+  if (loading || error || !tx) {
+    return <div className="txd-page">
+      <div className="txd-topbar"><div><span className="txd-connected-badge">Connected</span><button className="txd-back-link" onClick={onBack}><I name="arrow-left" size={14} /> Back to Ledger</button></div></div>
+      <div className="txd-card"><h2 className="txd-card-title">{loading ? 'Loading transaction…' : error}</h2></div>
+    </div>;
+  }
+
+  const amount = Number(tx.amount);
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
+  const isCredit = tx.type === 'credit';
+  const type = isCredit ? 'Credit' : 'Debit';
+  const status = tx.status ? tx.status.charAt(0).toUpperCase() + tx.status.slice(1) : 'Not available';
+  const transactionId = tx.transactionId || tx._id || 'Not available';
+  const date = formatDate(tx.createdAt);
+  const signedAmount = `${isCredit ? '+' : '-'}${formatINR(safeAmount)}`;
+  const timeline = [{ label: status, desc: 'Current transaction status', time: date, active: true }];
+  const downloadReceipt = () => downloadTextFile(`receipt-${transactionId}.txt`, [
+    'LedgerGuard Official Receipt',
+    `Transaction ID: ${transactionId}`,
+    `Type: ${type}`,
+    `Amount: ${signedAmount}`,
+    `Status: ${status}`,
+    `Date: ${date}`,
+    `Description: ${tx.description || 'Not available'}`,
+  ].join('\n'));
+  const downloadAuditReport = () => downloadTextFile(`audit-report-${transactionId}.txt`, [
+    'LedgerGuard Audit Report',
+    `Transaction ID: ${transactionId}`,
+    `Recorded: ${date}`,
+    `Status: ${status}`,
+    'Audit history: Not available from the current backend',
+  ].join('\n'));
 
   return (
     <div className="txd-page">
-      {/* Top bar */}
-      <div className="txd-topbar">
-        <div>
-          <span className="txd-connected-badge">Connected</span>
-          <button className="txd-back-link" onClick={onBack}>
-            <I name="arrow-left" size={14} /> Back to Ledger
-          </button>
-        </div>
-        <div className="txd-topbar-actions">
-          <button className="txd-outline-btn"><I name="printer" size={14} /> Print</button>
-          <button className="txd-outline-btn"><I name="share" size={14} /> Share</button>
-        </div>
-      </div>
+      <div className="txd-topbar"><div><span className="txd-connected-badge">Connected</span><button className="txd-back-link" onClick={onBack}><I name="arrow-left" size={14} /> Back to Ledger</button></div><div className="txd-topbar-actions"><button className="txd-outline-btn"><I name="printer" size={14} /> Print</button><button className="txd-outline-btn"><I name="share" size={14} /> Share</button></div></div>
 
-      {/* Title + Amount */}
-      <div className="txd-title-row">
-        <div>
-          <h1 className="txd-title">
-            {tx.type}
-            <span className={`txd-status-badge ${tx.status.toLowerCase()}`}>{tx.status}</span>
-          </h1>
-          <p className="txd-ref">Ref: {tx.refId} · {tx.date}</p>
-        </div>
-        <div className="txd-amount-block">
-          <span className="txd-amount-label">{tx.amountLabel}</span>
-          <span className={`txd-amount ${tx.amount.startsWith('-') ? 'debit' : 'credit'}`}>{tx.amount}</span>
-        </div>
-      </div>
+      <div className="txd-title-row"><div><h1 className="txd-title">{type}<span className={`txd-status-badge ${String(tx.status || '').toLowerCase()}`}>{status}</span></h1><p className="txd-ref">Ref: {transactionId} · {date}</p></div><div className="txd-amount-block"><span className="txd-amount-label">Transaction Amount</span><span className={`txd-amount ${isCredit ? 'credit' : 'debit'}`}>{signedAmount}</span></div></div>
 
-      {/* Two-column body */}
-      <div className="txd-body">
-        {/* Left Column */}
-        <div className="txd-left">
-          {/* Execution Details */}
-          <div className="txd-card">
-            <h2 className="txd-card-title">Execution Details</h2>
-            <div className="txd-detail-grid">
-              <div>
-                <span className="txd-label">Counterparty</span>
-                <span className="txd-value-bold">{tx.counterparty.name}</span>
-                <span className="txd-value-sub">Acct: ending in {tx.counterparty.acct}</span>
-              </div>
-              <div>
-                <span className="txd-label">Originating Entity</span>
-                <span className="txd-value-bold">{tx.originator.name}</span>
-                <span className="txd-value-sub">Acct: ending in {tx.originator.acct}</span>
-              </div>
-            </div>
-            <div className="txd-detail-grid" style={{ marginTop: 16 }}>
-              <div>
-                <span className="txd-label">SWIFT / BIC</span>
-                <code className="txd-code">{tx.swift}</code>
-              </div>
-              <div>
-                <span className="txd-label">Purpose Code</span>
-                <span className="txd-value-mono">{tx.purposeCode}</span>
-              </div>
-            </div>
-            <div style={{ marginTop: 16 }}>
-              <span className="txd-label">Memo / Notes</span>
-              <div className="txd-memo">{tx.memo}</div>
-            </div>
-          </div>
+      <div className="txd-body"><div className="txd-left">
+        <div className="txd-card"><h2 className="txd-card-title">Execution Details</h2><div className="txd-detail-grid"><div><span className="txd-label">Counterparty</span><span className="txd-value-bold">Not available</span><span className="txd-value-sub">Account details not available</span></div><div><span className="txd-label">Originating Entity</span><span className="txd-value-bold">Not available</span><span className="txd-value-sub">Account details not available</span></div></div><div className="txd-detail-grid" style={{ marginTop: 16 }}><div><span className="txd-label">SWIFT / BIC</span><code className="txd-code">Not available</code></div><div><span className="txd-label">Purpose Code</span><span className="txd-value-mono">Not available</span></div></div><div style={{ marginTop: 16 }}><span className="txd-label">Memo / Notes</span><div className="txd-memo">{tx.description || 'Not available'}</div></div></div>
 
-          {/* System Audit Log */}
-          <div className="txd-card">
-            <div className="txd-card-title-row">
-              <h2 className="txd-card-title">System Audit Log</h2>
-              <I name="sort-desc" size={15} />
-            </div>
-            <table className="txd-audit-table">
-              <thead>
-                <tr>
-                  <th>Timestamp (UTC)</th>
-                  <th>Event / Action</th>
-                  <th>Actor / System</th>
-                  <th>Signature ID</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tx.auditLog.map((row, i) => (
-                  <tr key={i}>
-                    <td className="txd-mono">{row.time}</td>
-                    <td>
-                      <span className="txd-audit-event">
-                        <I name="lock" size={13} /> {row.event}
-                      </span>
-                    </td>
-                    <td>{row.actor}</td>
-                    <td className="txd-mono txd-sig">{row.sig}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Right Column */}
-        <div className="txd-right">
-          {/* Processing Status */}
-          <div className="txd-card">
-            <h2 className="txd-card-title">Processing Status</h2>
-            <div className="txd-timeline">
-              {tx.timeline.map((step, i) => (
-                <div className={`txd-timeline-item${step.active ? ' active' : ''}`} key={i}>
-                  <div className="txd-timeline-dot-col">
-                    <div className={`txd-dot${step.active ? ' active' : ''}`}></div>
-                    {i < tx.timeline.length - 1 && <div className="txd-timeline-line"></div>}
-                  </div>
-                  <div className="txd-timeline-content">
-                    <span className="txd-timeline-label">{step.label}</span>
-                    <span className="txd-timeline-desc">{step.desc}</span>
-                    <span className="txd-timeline-time">{step.time}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div className="txd-card">
-            <h2 className="txd-card-title">Controls</h2>
-            <button className="txd-primary-btn">
-              <I name="download" size={15} /> Download Official Receipt
-            </button>
-            <button className="txd-secondary-btn">
-              <I name="file-text" size={15} /> Generate Audit Report
-            </button>
-            <button className="txd-link-btn">
-              <I name="flag" size={14} /> Flag / Dispute Transaction
-            </button>
-          </div>
-        </div>
-      </div>
+        <div className="txd-card"><div className="txd-card-title-row"><h2 className="txd-card-title">System Audit Log</h2><I name="sort-desc" size={15} /></div><table className="txd-audit-table"><thead><tr><th>Timestamp (UTC)</th><th>Event / Action</th><th>Actor / System</th><th>Signature ID</th></tr></thead><tbody><tr><td className="txd-mono">{date}</td><td><span className="txd-audit-event"><I name="lock" size={13} /> Transaction record</span></td><td>Not available</td><td className="txd-mono txd-sig">Not available</td></tr></tbody></table></div>
+      </div><div className="txd-right">
+        <div className="txd-card"><h2 className="txd-card-title">Processing Status</h2><div className="txd-timeline">{timeline.map((step, i) => <div className={`txd-timeline-item${step.active ? ' active' : ''}`} key={i}><div className="txd-timeline-dot-col"><div className={`txd-dot${step.active ? ' active' : ''}`}></div></div><div className="txd-timeline-content"><span className="txd-timeline-label">{step.label}</span><span className="txd-timeline-desc">{step.desc}</span><span className="txd-timeline-time">{step.time}</span></div></div>)}</div></div>
+        <div className="txd-card"><h2 className="txd-card-title">Controls</h2><button className="txd-primary-btn" onClick={downloadReceipt}><I name="download" size={15} /> Download Official Receipt</button><button className="txd-secondary-btn" onClick={downloadAuditReport}><I name="file-text" size={15} /> Generate Audit Report</button></div>
+      </div></div>
     </div>
   );
 }

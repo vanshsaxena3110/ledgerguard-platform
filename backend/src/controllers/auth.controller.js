@@ -149,3 +149,46 @@ export const logout = (req, res) => {
     message: "Logout successful",
   });
 };
+
+export const updateProfile = async (req, res) => {
+  try {
+    const name = req.body.name?.trim();
+    if (!name) return res.status(400).json({ message: "Name is required" });
+
+    const existingUser = await User.findOne({ name, _id: { $ne: req.user._id } });
+    if (existingUser) return res.status(400).json({ message: "User already exists" });
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { name },
+      { new: true, runValidators: true }
+    ).select("-password").populate("company");
+
+    res.json({ message: "Profile updated successfully", user });
+  } catch (error) {
+    console.error("Profile update error:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const updateCompany = async (req, res) => {
+  try {
+    const name = req.body.name?.trim();
+    if (!name) return res.status(400).json({ message: "Company name is required" });
+
+    const existingCompany = await Company.findOne({ name, _id: { $ne: req.companyId } });
+    if (existingCompany) return res.status(400).json({ message: "Company already exists" });
+
+    const company = await Company.findByIdAndUpdate(
+      req.companyId,
+      { name },
+      { new: true, runValidators: true }
+    );
+
+    if (!company) return res.status(404).json({ message: "Company not found" });
+    res.json({ message: "Company updated successfully", company });
+  } catch (error) {
+    console.error("Company update error:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};

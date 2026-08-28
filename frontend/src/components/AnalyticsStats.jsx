@@ -1,11 +1,13 @@
 import React from 'react';
 
-const stats = [
-  { label: 'TOTAL REVENUE', value: '$1.24M', change: '+12.5% vs last month', positive: true },
-  { label: 'TOTAL EXPENSES', value: '$842K', change: '-3.2% vs last month', positive: false },
-];
+const formatINR = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 
-export default function AnalyticsStats() {
+export default function AnalyticsStats({ totalRevenue = 0, totalExpenses = 0 }) {
+  const stats = [
+    { label: 'TOTAL REVENUE', value: formatINR(totalRevenue), change: '+12.5% vs last month', positive: true },
+    { label: 'TOTAL EXPENSES', value: formatINR(totalExpenses), change: '-3.2% vs last month', positive: false },
+  ];
+
   return (
     <div className="analytics-stats">
       {stats.map((stat) => (

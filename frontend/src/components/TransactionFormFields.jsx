@@ -95,7 +95,7 @@ export default function TransactionFormFields({
           </label>
 
           <div className="new-tx-amount-group">
-            <span className="currency-symbol">$</span>
+            <span className="currency-symbol">₹</span>
 
             <input
               type="number"
