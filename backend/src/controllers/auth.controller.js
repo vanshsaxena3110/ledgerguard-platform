@@ -71,25 +71,40 @@ export const signup = async (req, res) => {
     });
   }
 };
-
 export const login = async (req, res) => {
   try {
-    const { name, password } = req.body;
+    const { name, password, companyName } = req.body;
 
-    if (!name || !password) {
+    if (!name || !password || !companyName) {
       return res.status(400).json({
-        message: "Name and password are required",
+        message: "Company name, username and password are required",
       });
     }
 
-    const user = await User.findOne({ name }).populate("company");
+    // Find company
+    const company = await Company.findOne({
+      name: companyName,
+    });
+
+    if (!company) {
+      return res.status(401).json({
+        message: "Company not found",
+      });
+    }
+
+    // Find user belonging to this company
+    const user = await User.findOne({
+      name,
+      company: company._id,
+    }).populate("company");
 
     if (!user) {
       return res.status(401).json({
-        message: "Invalid credentials",
+        message: "User not found in this company",
       });
     }
 
+    // Check password
     const isPasswordCorrect = await bcrypt.compare(
       password,
       user.password
@@ -97,23 +112,26 @@ export const login = async (req, res) => {
 
     if (!isPasswordCorrect) {
       return res.status(401).json({
-        message: "Invalid credentials",
+        message: "Invalid password",
       });
     }
 
-    const token = generateToken(user._id, user.company._id);
-   
+    // Generate JWT
+    const token = generateToken(
+      user._id,
+      user.company._id
+    );
 
     res.json({
-  message: "Login successful",
-  token: token,
-  user: {
-    id: user._id,
-    name: user.name,
-    company: user.company.name,
-    role: user.role,
-  },
-});
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        company: user.company.name,
+        role: user.role,
+      },
+    });
 
   } catch (error) {
     console.error("Login error:", error.message);

@@ -1,31 +1,55 @@
 import React, { useState } from 'react';
 import buildingBg from '../assets/building.png';
+import { login, signup } from '../services/api';
 
 export default function Login({ onLoginSuccess }) {
   const [isRegister, setIsRegister] = useState(false);
   
   // Login form states
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginName, setLoginName] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginCompany, setLoginCompany] = useState('');
   const [loginShowPassword, setLoginShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
   // Register form states
   const [regName, setRegName] = useState('');
-  const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [regCompanyName, setRegCompanyName] = useState('');
   const [regShowPassword, setRegShowPassword] = useState(false);
   const [regShowConfirmPassword, setRegShowConfirmPassword] = useState(false);
+  const [registerError, setRegisterError] = useState('');
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    if (onLoginSuccess) onLoginSuccess();
+    setLoginError('');
+    try {
+      const data = await login({ name: loginName, password: loginPassword, companyName: loginCompany });
+      if (data.token) localStorage.setItem('token', data.token);
+      if (onLoginSuccess) onLoginSuccess();
+    } catch (error) {
+      setLoginError(error.message);
+    }
   };
 
-  const handleRegisterSubmit = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    console.log('Register submitted', { regName, regEmail, regPassword, regConfirmPassword });
+    setRegisterError('');
+    if (regPassword !== regConfirmPassword) {
+      setRegisterError('Passwords do not match');
+      return;
+    }
+    try {
+      await signup({ name: regName, password: regPassword, companyName: regCompanyName });
+      setIsRegister(false);
+      setLoginName(regName);
+      setLoginCompany(regCompanyName);
+      setRegPassword('');
+      setRegConfirmPassword('');
+    } catch (error) {
+      setRegisterError(error.message);
+    }
   };
 
   return (
@@ -61,21 +85,21 @@ export default function Login({ onLoginSuccess }) {
               <h2 className="form-title">Sign In</h2>
               <p className="form-subtitle">Enter your credentials to access your workspace.</p>
 
-              {/* Email/Name Field */}
+              {/* Name Field */}
               <div className="form-group">
-                <label className="form-label">EMAIL</label>
+                <label className="form-label">Username</label>
                 <div className="input-wrapper">
                   <svg className="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="4" width="18" height="14" rx="2" ry="2" />
                     <polyline points="22,6 12,13 2,6" />
                   </svg>
                   <input
-                    type="email"
-                    required
-                    placeholder="e.g. jane.doe@example.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="form-input"
+                  type="text"
+                  required
+                  placeholder="Enter your username"
+                  value={loginName}
+                  onChange={(e) => setLoginName(e.target.value)}
+                  className="form-input"
                   />
                 </div>
               </div>
@@ -134,7 +158,7 @@ export default function Login({ onLoginSuccess }) {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Acme Corp"
+                    placeholder="Enter Your Comapny Name"
                     value={loginCompany}
                     onChange={(e) => setLoginCompany(e.target.value)}
                     className="form-input"
@@ -152,6 +176,7 @@ export default function Login({ onLoginSuccess }) {
                   </svg>
                 </button>
               </div>
+              {loginError && <p className="auth-error" role="alert">{loginError}</p>}
 
               {/* Toggle Switch */}
               <p className="toggle-text">
@@ -178,32 +203,27 @@ export default function Login({ onLoginSuccess }) {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Jane Doe"
+                    placeholder="Aman Gupta"
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
                     className="form-input"
                   />
                 </div>
               </div>
+                    <div className="form-group">
+  <label className="form-label">COMPANY NAME</label>
+  <div className="input-wrapper">
+    <input
+      type="text"
+      required
+      placeholder="e.g. Infotact Solutions"
+      value={regCompanyName}
+      onChange={(e) => setRegCompanyName(e.target.value)}
+      className="form-input"
+    />
+  </div>
+</div>
 
-              {/* Email Field */}
-              <div className="form-group">
-                <label className="form-label">EMAIL</label>
-                <div className="input-wrapper">
-                  <svg className="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="14" rx="2" ry="2" />
-                    <polyline points="22,6 12,13 2,6" />
-                  </svg>
-                  <input
-                    type="email"
-                    required
-                    placeholder="e.g. jane.doe@example.com"
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    className="form-input"
-                  />
-                </div>
-              </div>
 
               {/* Password Field */}
               <div className="form-group">
@@ -289,6 +309,7 @@ export default function Login({ onLoginSuccess }) {
                   </svg>
                 </button>
               </div>
+              {registerError && <p className="auth-error" role="alert">{registerError}</p>}
 
               {/* Toggle Switch */}
               <p className="toggle-text">
