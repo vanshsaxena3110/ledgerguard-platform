@@ -23,12 +23,6 @@ const STATS = [
   { title: 'Volume', value: '14,239', icon: 'file', color: '#3b82f6', sub: 'Processed transactions' },
 ];
 
-const TRANSACTIONS = [
-  { id: 'TX-992384A', date: 'Oct 24, 14:32 EST', party: 'Acme Corp', amount: '+₹125,888.90', status: 'Completed' },
-  { id: 'TX-881275B', date: 'Oct 23, 09:15 EST', party: 'GlobalTech Inc', amount: '-₹42,300.00', status: 'Pending' },
-  { id: 'TX-770166C', date: 'Oct 22, 16:48 EST', party: 'Nexus Holdings', amount: '+₹89,450.25', status: 'Completed' },
-];
-
 const TREND_DATA = [
   { label: 'Jan', value: 320 }, { label: 'Feb', value: 480 },
   { label: 'Mar', value: 420 }, { label: 'Apr', value: 610 },
@@ -40,6 +34,25 @@ const TREND_DATA = [
 
 const FILTER_OPTIONS = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'This Year', 'All Time'];
 const formatINR = (amount) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+
+function transactionMatchesFilters(transaction, filters) {
+  const search = filters.search.trim().toLowerCase();
+  const matchesSearch = !search
+    || transaction.transactionId?.toLowerCase().includes(search)
+    || transaction.description?.toLowerCase().includes(search);
+  const amount = Number(transaction.amount);
+  const date = new Date(transaction.createdAt);
+  const endDate = filters.endDate ? new Date(`${filters.endDate}T00:00:00`) : null;
+  if (endDate) endDate.setDate(endDate.getDate() + 1);
+  const matchesDate = (!filters.startDate || date >= new Date(`${filters.startDate}T00:00:00`))
+    && (!endDate || date < endDate);
+  return matchesSearch
+    && (!filters.type || transaction.type === filters.type)
+    && (!filters.status || transaction.status === filters.status)
+    && matchesDate
+    && (!filters.minAmount || amount >= Number(filters.minAmount))
+    && (!filters.maxAmount || amount <= Number(filters.maxAmount));
+}
 
 /* ── Icon helper ── */
 function Icon({ name, size = 18 }) {
@@ -157,14 +170,6 @@ function LineChart() {
 }
 
 /* ════════════════ DASHBOARD ════════════════ */
-/* ── Export CSV helper ── */
-function exportCSV() {
-  const header = 'Transaction ID,Date & Time,Counterparty,Amount,Status';
-  const rows = TRANSACTIONS.map(t => `${t.id},${t.date},${t.party},${t.amount},${t.status}`);
-  const blob = new Blob([header + '\n' + rows.join('\n')], { type: 'text/csv' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'transactions.csv'; a.click();
-}
-
 export default function Dashboard({ onLogout }) {
   const [activeNav, setActiveNav] = useState('dashboard');
   const [filter, setFilter] = useState('Last 30 Days');
@@ -173,22 +178,38 @@ export default function Dashboard({ onLogout }) {
 
   const [dbTransactions, setDbTransactions] = useState([]);
   const [loadingTxs, setLoadingTxs] = useState(false);
+  const [transactionError, setTransactionError] = useState('');
+  const [transactionFilters, setTransactionFilters] = useState({
+    search: '', type: '', status: '', startDate: '', endDate: '', minAmount: '', maxAmount: '',
+  });
+  const transactionFiltersRef = useRef(transactionFilters);
+  const transactionsRequestRef = useRef(0);
+  transactionFiltersRef.current = transactionFilters;
 
-  const loadTransactions = async () => {
+  const loadTransactions = async (filters = transactionFilters) => {
     setLoadingTxs(true);
+    setTransactionError('');
+    const requestId = ++transactionsRequestRef.current;
     try {
-      const data = await fetchTransactions();
+      const data = await fetchTransactions(filters);
+      if (requestId !== transactionsRequestRef.current) return;
       setDbTransactions(data);
     } catch (err) {
+      if (requestId !== transactionsRequestRef.current) return;
       console.error('Failed to load transactions:', err);
+      setDbTransactions([]);
+      setTransactionError(err.message || 'Unable to load transactions.');
     } finally {
       setLoadingTxs(false);
     }
   };
 
   useEffect(() => {
-    loadTransactions();
+    const timeout = setTimeout(() => loadTransactions(transactionFilters), 250);
+    return () => clearTimeout(timeout);
+  }, [transactionFilters]);
 
+  useEffect(() => {
     const getCompanyId = () => {
       try {
         const token = getAuthToken();
@@ -203,10 +224,13 @@ export default function Dashboard({ onLogout }) {
       if (companyId) socket.emit('joinCompany', companyId);
     };
     const handleCreated = ({ transaction }) => {
-      if (transaction) setDbTransactions((current) => [transaction, ...current.filter((tx) => tx._id !== transaction._id)]);
+      if (transaction && transactionMatchesFilters(transaction, transactionFiltersRef.current)) setDbTransactions((current) => [transaction, ...current.filter((tx) => tx._id !== transaction._id)]);
     };
     const handleUpdated = ({ transaction }) => {
-      if (transaction) setDbTransactions((current) => current.map((tx) => tx._id === transaction._id ? transaction : tx));
+      if (transaction) setDbTransactions((current) => {
+        const next = current.filter((tx) => tx._id !== transaction._id);
+        return transactionMatchesFilters(transaction, transactionFiltersRef.current) ? [transaction, ...next] : next;
+      });
     };
     const handleDeleted = ({ transactionId }) => {
       setDbTransactions((current) => current.filter((tx) => tx._id !== transactionId && tx.transactionId !== transactionId));
@@ -225,7 +249,7 @@ export default function Dashboard({ onLogout }) {
       socket.off('transactionDeleted', handleDeleted);
       socket.disconnect();
     };
-  }, []);
+  }, [transactionFilters]);
 
   const mapTx = (tx) => {
     const dateObj = new Date(tx.createdAt);
@@ -239,7 +263,7 @@ export default function Dashboard({ onLogout }) {
       ? `+${formatINR(tx.amount)}`
       : `-${formatINR(tx.amount)}`;
 
-    const capStatus = tx.status ? tx.status.charAt(0).toUpperCase() + tx.status.slice(1) : 'Completed';
+    const capStatus = tx.status ? tx.status.charAt(0).toUpperCase() + tx.status.slice(1) : 'Unknown';
 
     return {
       id: tx.transactionId,
@@ -380,7 +404,36 @@ export default function Dashboard({ onLogout }) {
                   </button>
                 </div>
               </div>
+              <div className="transaction-filters" aria-label="Transaction filters">
+                <label className="transaction-search">
+                  <span className="sr-only">Search transactions</span>
+                  <input
+                    type="search"
+                    placeholder="Search by transaction ID or description"
+                    value={transactionFilters.search}
+                    onChange={(e) => setTransactionFilters((current) => ({ ...current, search: e.target.value }))}
+                  />
+                </label>
+                <label className="transaction-filter-field">
+                  <span>Type</span>
+                  <select value={transactionFilters.type} onChange={(e) => setTransactionFilters((current) => ({ ...current, type: e.target.value }))}>
+                    <option value="">All</option><option value="credit">Credit</option><option value="debit">Debit</option>
+                  </select>
+                </label>
+                <label className="transaction-filter-field">
+                  <span>Status</span>
+                  <select value={transactionFilters.status} onChange={(e) => setTransactionFilters((current) => ({ ...current, status: e.target.value }))}>
+                    <option value="">All</option><option value="pending">Pending</option><option value="completed">Completed</option><option value="failed">Failed</option>
+                  </select>
+                </label>
+                <label className="transaction-filter-field"><span>Start date</span><input type="date" value={transactionFilters.startDate} onChange={(e) => setTransactionFilters((current) => ({ ...current, startDate: e.target.value }))} /></label>
+                <label className="transaction-filter-field"><span>End date</span><input type="date" value={transactionFilters.endDate} onChange={(e) => setTransactionFilters((current) => ({ ...current, endDate: e.target.value }))} /></label>
+                <label className="transaction-filter-field"><span>Min amount</span><input type="number" min="0" step="0.01" placeholder="₹ 0.00" value={transactionFilters.minAmount} onChange={(e) => setTransactionFilters((current) => ({ ...current, minAmount: e.target.value }))} /></label>
+                <label className="transaction-filter-field"><span>Max amount</span><input type="number" min="0" step="0.01" placeholder="₹ 0.00" value={transactionFilters.maxAmount} onChange={(e) => setTransactionFilters((current) => ({ ...current, maxAmount: e.target.value }))} /></label>
+                <button className="dash-filter-btn" onClick={() => setTransactionFilters({ search: '', type: '', status: '', startDate: '', endDate: '', minAmount: '', maxAmount: '' })}>Clear</button>
+              </div>
               <div className="dash-table-card">
+                {transactionError && <div className="transaction-error" role="alert">{transactionError}</div>}
                 <table className="dash-table">
                   <thead>
                     <tr>
@@ -393,10 +446,12 @@ export default function Dashboard({ onLogout }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {transactionsToRender.length === 0 ? (
+                    {loadingTxs ? (
+                      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>Loading transactions…</td></tr>
+                    ) : transactionsToRender.length === 0 ? (
                       <tr>
                         <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
-                          No transactions found. Click "+ New Transaction" to create one.
+                          {transactionError ? 'Unable to load transactions.' : transactionFilters.search || Object.values(transactionFilters).some(Boolean) ? 'No matching transactions found.' : 'No transactions found. Click "+ New Transaction" to create one.'}
                         </td>
                       </tr>
                     ) : (

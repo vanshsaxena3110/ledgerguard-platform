@@ -34,8 +34,13 @@ async function apiRequest(endpoint, options = {}) {
   return response.json();
 }
 
-export async function fetchTransactions() {
-  const data = await apiRequest('/transactions');
+export async function fetchTransactions(filters = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') params.set(key, value);
+  });
+  const query = params.toString();
+  const data = await apiRequest(`/transactions${query ? `?${query}` : ''}`);
   return data.transactions || [];
 }
 

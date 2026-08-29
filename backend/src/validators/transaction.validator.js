@@ -13,6 +13,8 @@ export const transactionSchema = Joi.object({
     .trim()
     .max(200)
     .allow(""),
+
+  status: Joi.string().valid("pending", "completed", "failed"),
 });
 
 export const updateTransactionSchema = Joi.object({

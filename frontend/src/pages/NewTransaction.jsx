@@ -41,11 +41,11 @@ export default function NewTransaction({ onCancel, onSuccess }) {
     setLoading(true);
 
     try {
-      // Backend only supports type, amount, description
       const createdTx = await createTransaction({
         type,
         amount: parseFloat(amount),
-        description: description.trim()
+        description: description.trim(),
+        status,
       });
       
       setSuccess(true);

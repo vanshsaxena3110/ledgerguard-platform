@@ -620,6 +620,34 @@ body {
   flex-shrink: 0;
 }
 
+.transaction-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin: -8px 0 18px;
+}
+
+.transaction-search { flex: 1 1 260px; }
+.transaction-search input, .transaction-filter-field input, .transaction-filter-field select {
+  box-sizing: border-box;
+  width: 100%;
+  height: 34px;
+  border: 1px solid #e2e5ea;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: .74rem;
+  padding: 0 10px;
+}
+.transaction-search input:focus, .transaction-filter-field input:focus, .transaction-filter-field select:focus { outline: none; border-color: #94a3b8; box-shadow: 0 0 0 1px #cbd5e1; }
+.transaction-filter-field { width: 112px; }
+.transaction-filter-field span { display: block; color: #64748b; font-size: .65rem; font-weight: 650; margin-bottom: 4px; }
+.transaction-error { margin-bottom: 12px; padding: 9px 11px; border: 1px solid #fecaca; border-radius: 6px; background: #fef2f2; color: #b91c1c; font-size: .75rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 760px) { .transaction-filters { align-items: stretch; } .transaction-filter-field { flex: 1 1 130px; width: auto; } .transaction-search { flex-basis: 100%; } }
+
 .dash-filter-btn {
   display: flex;
   align-items: center;
