@@ -95,7 +95,7 @@ export default function NewTransaction({ onCancel, onSuccess }) {
         )}
 
         <div className="new-tx-grid">
-          {/* Left Column */}
+        
           <div className="new-tx-col">
             {/* Transaction Type */}
             <div className="new-tx-group">

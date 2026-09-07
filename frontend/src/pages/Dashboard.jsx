@@ -84,7 +84,7 @@ function Icon({ name, size = 18 }) {
   return <svg viewBox="0 0 24 24" style={s} {...p}>{icons[name]}</svg>;
 }
 
-/* ── Dropdown ── */
+
 function Dropdown({ options, selected, onSelect, open, onToggle }) {
   const ref = useRef(null);
   useEffect(() => {

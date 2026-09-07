@@ -5,14 +5,14 @@ import { login, signup } from '../services/api';
 export default function Login({ onLoginSuccess }) {
   const [isRegister, setIsRegister] = useState(false);
   
-  // Login form states
+  
   const [loginName, setLoginName] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginCompany, setLoginCompany] = useState('');
   const [loginShowPassword, setLoginShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
 
-  // Register form states
+  
   const [regName, setRegName] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
