@@ -19,7 +19,7 @@ const NAV_ITEMS = [
 const STATS = [
   { title: 'Total Balance', value: '₹12,450,', icon: 'bank', color: '#6b7280', sub: '↗ +2.4% vs last month' },
   { title: 'Total Credit', value: '₹3,240,500.0', icon: 'arrow-down', color: '#10b981', sub: 'Inbound volume (MTD)', arrow: '↓' },
-  { title: 'Total Debit', value: '₹1,890,200.0', icon: 'arrow-up', color: '#ef4444', sub: 'Outbound volume (MTD)', arrow: '↑' },
+  { title: 'Total Debit', value: '₹1,892,200.0', icon: 'arrow-up', color: '#ef4444', sub: 'Outbound volume (MTD)', arrow: '↑' },
   { title: 'Volume', value: '14,339', icon: 'file', color: '#3b82f6', sub: 'Processed transactions' },
 ];
 
