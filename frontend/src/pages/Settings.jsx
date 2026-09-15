@@ -42,7 +42,7 @@ export default function Settings() {
       setCompany({ name: data.company?.name || company.name });
       setFeedback({ type: 'success', text: 'Changes saved' });
     } catch (error) {
-      setFeedback({ type: 'error', text: error.message || 'Unable to save company' });
+      setFeedback({ type: 'error', text: error.message || 'Unable to savee company' });
     }
   };
 
